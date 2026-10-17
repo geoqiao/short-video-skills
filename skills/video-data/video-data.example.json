@@ -1,0 +1,6 @@
+{
+ "time": "12:10",
+ "timezone": "Asia/Shanghai",
+ "platforms": ["douyin", "weixin", "xiaohongshu"],
+ "outDir": "data/snapshots"
+}

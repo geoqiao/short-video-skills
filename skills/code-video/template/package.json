@@ -1,0 +1,11 @@
+{
+  "name": "code-video-project",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node --check src/lib.js && node --check src/run.js && node --check tools/render.mjs && for f in episodes/*/shots.js; do node --check \"$f\"; done"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.64.0"
+  }
+}

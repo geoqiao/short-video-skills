@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<style>html,body{margin:0;overflow:hidden}canvas{display:block}</style>
+</head>
+<body>
+<canvas id="stage" width="1920" height="1080"></canvas>
+<script>
+  // ?v=<期号>-<slug> 选择一期；时间线由 tools/voice.py 生成到该期的 build/timeline.js。
+  // 品牌（window.BRAND）和头像（window.AVATAR_SRC）由 tools/render.mjs 注入。
+  const episode = '../episodes/' + new URLSearchParams(location.search).get('v');
+  const load = (src) => new Promise((ok, bad) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = bad; document.body.appendChild(s); });
+  window.READY = (async () => {
+    if (window.AVATAR_SRC) {
+      window.AVATAR = new Image();
+      window.AVATAR.src = window.AVATAR_SRC;
+      await window.AVATAR.decode();
+    }
+    await load('lib.js');
+    await load(episode + '/build/timeline.js');
+    await load(episode + '/shots.js');
+    await load('run.js');
+    const { F } = window.E;
+    await Promise.all(['900 74px ' + F.serif, '500 40px ' + F.sans, '500 34px ' + F.mono].map((f) => document.fonts.load(f, '字A')));
+    window.render(0);
+  })();
+</script>
+</body>
+</html>

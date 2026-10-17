@@ -1,0 +1,20 @@
+{
+  "series": "我的讲解系列",
+  "handle": "@yourname",
+  "avatar": null,
+  "colors": {
+    "paper": "#FAF7F2",
+    "ink": "#1C1B18",
+    "mute": "#8A8580",
+    "line": "#E2DBD2",
+    "soft": "#F0EAE2",
+    "accent": "#D14289",
+    "green": "#4FAE8F",
+    "white": "#FFFFFF"
+  },
+  "fonts": {
+    "serif": "\"Songti SC\",\"STSong\",serif",
+    "sans": "\"PingFang SC\",\"Hiragino Sans GB\",sans-serif",
+    "mono": "\"SF Mono\",\"Menlo\",monospace"
+  }
+}
