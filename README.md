@@ -2,9 +2,9 @@
 
 状态：`prototype`
 
-三份给 coding agent 用的 skill：用代码做讲解类短视频，发布到中文短视频平台（写文案、代填发布表单），每天定时采集作品数据。不用视频生成模型，画面、封面、配音时间线都由代码生成。
+三份给 coding agent 用的 skill：用代码做短视频，把视频发布到中文短视频平台（写文案、代填发布表单），每天定时采集作品数据。三份可以单独用：发布和采集不管视频是怎么做的，剪映剪的、实拍的都行。
 
-*Three agent skills for short explainer videos: make them with code (Canvas frames + TTS + ffmpeg, no video-generation model), publish them to Douyin, WeChat Channels and Xiaohongshu (search-aware post copy, then filling the publish forms in the user's signed-in Chrome), and collect each day's creator-dashboard data on a configurable schedule. The docs are in Chinese because the platforms are.*
+*Three agent skills for short videos, usable on their own: make narrated videos with code (Canvas frames + TTS + ffmpeg, no video-generation model), publish any video to Douyin, WeChat Channels and Xiaohongshu (search-aware post copy, then filling the publish forms in the user's signed-in Chrome), and collect each day's creator-dashboard data on a configurable schedule. The docs are in Chinese because the platforms are.*
 
 | skill | 做什么 | 附带 |
 | --- | --- | --- |
@@ -12,7 +12,9 @@
 | [video-publish](skills/video-publish/SKILL.md) | 读抖音、小红书、Google 的搜索联想词写标题、描述、话题、封面字和置顶评论；再用 playwright-cli 在抖音、视频号、小红书的发布页上传视频和封面、填好表单，默认停在发布按钮前 | 三个只读的联想词脚本、文件注入脚本、文案模板、平台规则表、三个平台的选择器和坑 |
 | [video-data](skills/video-data/SKILL.md) | 每天按配置的时间，只读采集三个平台创作者后台的作品数据，存成快照，再排成每条作品的时间序列 | 采集脚本、定时配置、汇总脚本 |
 
-三份 skill 可以单独用，也可以连起来：code-video 出片和封面 → video-publish 写文案、填表单 → video-data 每天采数据。选题和查资料因人而异，不在这里。
+code-video 适合以图形、文字、代码和数据图为主、配旁白的视频，例如知识讲解、软件教程、产品功能介绍、数据解读、清单盘点；不拍摄、不生成写实画面，所以不适合实拍、真人出镜、剧情和实物展示。
+
+三份 skill 也可以连起来：code-video 出片和封面 → video-publish 写文案、填表单 → video-data 每天采数据。选题和查资料因人而异，不在这里。
 
 ## 安装
 
