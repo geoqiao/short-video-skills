@@ -19,8 +19,9 @@ import edge_tts
 import numpy as np
 
 SR = 48000
-# HEAD 是第一句旁白的起点，要大于 src/run.js 里的 COVER + LEAD。封面只停一瞬，开头两秒留不住人就没有后面
-HEAD, GAP, TAIL = 1.0, 0.75, 1.6
+# HEAD 是第一句旁白的起点。封面在 src/run.js 的 COVER 秒开始滑走，旁白在滑动中途开口，
+# 前两秒能念 8–9 个字：第一句只放这一期最想告诉观众的那一点。开头两秒留不住人就没有后面
+HEAD, GAP, TAIL = 0.5, 0.75, 1.6
 ROOT = Path(__file__).resolve().parent.parent
 
 
