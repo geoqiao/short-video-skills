@@ -3,8 +3,9 @@
   const { C, F, txt, rise, pop, rrect, arrow, chip, title, code, sign } = window.E;
 
   const shots = [
-    // 1 结论先行：每一帧都是代码
+    // 1 结论先行：每一帧都是代码。先贴近大字，第 2 个分句起拉远露出右边的帧
     (c, k) => {
+      k.cam(c, [{ at: 1, delay: 0.1, dur: 1.0 }], { x: 700, y: 420, z: 1.15 });
       rise(c, k.at(0, -0.3, 0.8), () => txt(c, '每一帧', 132, 330, { size: 170, font: F.serif, weight: 900 }), 0, -60);
       rise(c, k.at(1, 0), () => txt(c, '都是代码画的', 132, 520, { size: 120, font: F.serif, weight: 900, color: C.accent }), 0, -40);
       [0, 1, 2, 3].forEach((i) => pop(c, k.at(1, 0.3 + i * 0.2), 1240 + i * 130, 700, () => {

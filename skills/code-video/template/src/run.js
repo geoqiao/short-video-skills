@@ -1,11 +1,15 @@
-// 时间线驱动：第 0 帧是封面，之后镜头横向排开，用平移衔接。
+// 时间线驱动：第 0 帧是封面，之后每个镜头接上一镜头。转场默认横向平移；
+// shots.js 可以写 window.TRANSITIONS = { 3: 'push' } 改第 3 个镜头的进场方式（pan 平移、cut 硬切、push 推进）。
+// script.json 的 turns 里的镜头默认硬切。
 (function () {
-  const { W, H, C, F, clamp, eo, eio, txt, measure, rrect, stroke, mark, HANDLE, SERIES } = window.E;
+  const { W, H, C, F, clamp, eo, eio, txt, measure, rrect, stroke, mark, HANDLE, SERIES, seen, cue } = window.E;
   const cv = document.getElementById('stage');
   const c = cv.getContext('2d');
-  const TL = window.TIMELINE, SHOTS = window.SHOTS;
+  const TL = window.TIMELINE, SHOTS = window.SHOTS, TR = window.TRANSITIONS || {};
   const COVER = 0.3, LEAD = 0.6, MOVE = 0.95;
-  const shotStart = (i) => (i === 0 ? COVER : TL.lines[i].start - LEAD);
+  const kind = (i) => (i <= 0 ? 'pan' : TR[i + 1] || ((TL.turns || []).includes(i + 1) ? 'cut' : 'pan'));
+  // 硬切落在开口前一点点：安静之后，画面和第一个字一起来
+  const shotStart = (i) => (i === 0 ? COVER : TL.lines[i].start - (kind(i) === 'cut' ? 0.05 : LEAD));
 
   function ctxFor(i, t) {
     const L = TL.lines[i];
@@ -13,7 +17,20 @@
     const segs = L.segs.map((s) => s.start - L.start);
     const at = (j, delay = 0, d = 0.7) => eo((tl - (segs[Math.min(j, segs.length - 1)] + delay)) / d);
     const raw = (j, delay = 0, d = 0.7) => clamp((tl - (segs[Math.min(j, segs.length - 1)] + delay)) / d);
-    return { t: tl, d: L.end - L.start, segs, at, raw, on: (j, d) => at(j, 0, d) };
+    // 镜头内运镜：在画任何东西之前调用。from 是起始取景（默认全景），
+    // moves 每一步在第 at 个分句后 delay 秒开始、dur 秒内移到以 (x, y) 为中心、放大 z 倍的取景。
+    const cam = (c, moves, from) => {
+      let s = Object.assign({ x: W / 2, y: H / 2, z: 1 }, from);
+      for (const m of moves) {
+        const p = eio(raw(m.at || 0, m.delay || 0, m.dur || 0.9));
+        const to = { x: m.x ?? W / 2, y: m.y ?? H / 2, z: m.z ?? 1 };
+        s = { x: s.x + (to.x - s.x) * p, y: s.y + (to.y - s.y) * p, z: s.z + (to.z - s.z) * p };
+      }
+      // 取景不出画布边
+      const x = clamp(s.x, W / 2 / s.z, W - W / 2 / s.z), y = clamp(s.y, H / 2 / s.z, H - H / 2 / s.z);
+      c.translate(W / 2, H / 2); c.scale(s.z, s.z); c.translate(-x, -y);
+    };
+    return { t: tl, d: L.end - L.start, segs, at, raw, cam, on: (j, d) => at(j, 0, d) };
   }
 
   function background(camX) {
@@ -57,30 +74,66 @@
     t = clamp(t, 0, TL.duration);
     let i = -1;
     for (let j = 0; j < TL.lines.length; j++) if (t >= shotStart(j)) i = j;
-    const mv = i < 0 ? 1 : eio((t - shotStart(i)) / MOVE);
-    const camX = (i - 1 + mv) * W;
+    const type = kind(i);
+    const mv = i < 0 || type === 'cut' ? 1 : eio((t - shotStart(i)) / MOVE);
+    const camX = type === 'pan' ? (i - 1 + mv) * W : i * W;
     c.setTransform(1, 0, 0, 1, 0, 0);
+    seen.list = [];
     background(camX);
-    const draw = (j) => {
+    const draw = (j, alpha = 1, zoom = 1) => {
       c.save();
-      c.translate(j * W - camX, 0);
+      if (type === 'pan') c.translate(j * W - camX, 0);
+      c.globalAlpha = alpha;
+      if (zoom !== 1) { c.translate(W / 2, H / 2); c.scale(zoom, zoom); c.translate(-W / 2, -H / 2); }
       if (j < 0) cover();
       else if (j < SHOTS.length) {
         const k = ctxFor(j, t);
         // 镜头内缓慢推近
         const z = 1 + 0.025 * clamp((t - shotStart(j)) / (k.d + LEAD + 1));
         c.translate(W / 2, H / 2); c.scale(z, z); c.translate(-W / 2, -H / 2);
+        seen.on = true; cue.shot = j;
         SHOTS[j](c, k);
+        seen.on = false;
       }
       c.restore();
     };
-    if (mv < 1 || i < 0) draw(i - (i < 0 ? 0 : 1));
-    if (i >= 0) draw(i);
+    if (i < 0) draw(-1);
+    else if (mv < 1 && type === 'push') {
+      // 推进：上一镜头放大淡出，下一镜头从稍小放大到原尺寸
+      draw(i - 1, 1 - mv, 1 + 0.6 * mv);
+      draw(i, mv, 0.9 + 0.1 * mv);
+    } else {
+      if (mv < 1) draw(i - 1);
+      draw(i);
+    }
     c.setTransform(1, 0, 0, 1, 0, 0);
     subtitle(t);
     // 进度条：主色走线，点睛色收笔
     const x = W * (t / TL.duration);
     c.fillStyle = C.accent; c.fillRect(0, H - 12, x, 12);
     c.fillStyle = C.green; c.fillRect(Math.max(0, x - 36), H - 12, Math.min(36, x), 12);
+  };
+
+  // 音效事件：从头到尾逐帧画一遍，返回 [{t, type}]，type 是 rise、pop、line、stroke、key（打字）和 cut（镜头切换）
+  window.CUES = function (fps) {
+    const ev = [];
+    let prev = new Map();
+    cue.on = true;
+    for (let f = 0; f <= Math.ceil(TL.duration * fps); f++) {
+      const t = f / fps;
+      cue.list = []; cue.n = {};
+      window.render(t);
+      const now = new Map();
+      for (const [type, key, p] of cue.list) now.set(key, [type, p]);
+      for (const [key, [type, p]] of now) {
+        const was = prev.has(key) ? prev.get(key)[1] : 0;
+        if (type === 'type') { if (p > was && p < 1) ev.push({ t, type: 'key' }); }
+        else if (p > 0 && was <= 0) ev.push({ t, type });
+      }
+      prev = now;
+    }
+    cue.on = false;
+    for (let j = 1; j < TL.lines.length; j++) ev.push({ t: +shotStart(j).toFixed(3), type: kind(j) === 'pan' ? 'whoosh' : kind(j) });
+    return ev.sort((a, b) => a.t - b.t);
   };
 })();

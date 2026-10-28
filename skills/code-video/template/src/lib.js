@@ -21,15 +21,40 @@
   // 手机竖持看横屏时画面只有约 390pt 宽，1920 画布上的 24px 只剩 5pt。
   // 所以小字统一抬高：24→34、34→41、44→48，56 以上不动。
   const fit = (s) => (s >= 56 ? s : Math.round(34 + ((s - 24) * 22) / 32));
+  // 阅读时长检查（render.mjs --readcheck）：run.js 画镜头时打开，记下每段字在屏幕上的框和透明度。
+  // 来源脚注（传入字号不超过 24）和 o.read === false 的字不记。
+  const seen = { on: false, list: [] };
+  // 音效事件（render.mjs 渲染前逐帧过一遍）：动画元素每帧记下进度，进度从 0 变正的那一帧就是出场。
+  // 同一段代码画的元素按出现顺序编号，所以同一个辅助函数画的几个元素各算各的。
+  const cue = { on: false, list: [], n: {}, shot: 0, inner: 0 };
+  function cueNote(kind, sig, p) {
+    if (!cue.on || cue.inner) return;
+    const key = cue.shot + '|' + kind + '|' + sig;
+    cue.n[key] = (cue.n[key] || 0) + 1;
+    cue.list.push([kind, key + '|' + cue.n[key], p]);
+  }
+  function note(c, s, x, y, w, px, o) {
+    const left = o.align === 'center' ? x - w / 2 : o.align === 'right' ? x - w : x;
+    const base = o.base || 'alphabetic';
+    const top = base === 'middle' ? y - px / 2 : base === 'top' ? y : y - px * 0.8;
+    const m = c.getTransform();
+    const xs = [], ys = [];
+    for (const [px_, py] of [[left, top], [left + w, top], [left, top + px], [left + w, top + px]]) {
+      xs.push(m.a * px_ + m.c * py + m.e); ys.push(m.b * px_ + m.d * py + m.f);
+    }
+    seen.list.push({ s, a: c.globalAlpha, x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) });
+  }
   function txt(c, s, x, y, o = {}) {
     c.save();
-    c.font = (o.weight || 400) + ' ' + fit(o.size || 40) + 'px ' + (o.font || F.sans);
+    const px = fit(o.size || 40);
+    c.font = (o.weight || 400) + ' ' + px + 'px ' + (o.font || F.sans);
     c.fillStyle = o.color || C.ink;
     c.textAlign = o.align || 'left';
     c.textBaseline = o.base || 'alphabetic';
     if (o.alpha != null) c.globalAlpha *= clamp(o.alpha);
     c.fillText(s, x, y);
     const w = c.measureText(s).width;
+    if (seen.on && o.read !== false && (o.size || 40) > 24 && String(s).trim()) note(c, String(s), x, y, w, px, o);
     c.restore();
     return w;
   }
@@ -43,6 +68,7 @@
   // 进场：透明度加一小段位移，p 为 0..1
   function rise(c, p, fn, dy = 26, dx = 0) {
     p = clamp(p);
+    if (cue.on) cueNote('rise', fn.toString(), p);
     if (p <= 0) return;
     c.save();
     c.globalAlpha *= p;
@@ -52,6 +78,7 @@
   }
   // 以中心点弹出
   function pop(c, p, cx, cy, fn) {
+    if (cue.on) cueNote('pop', fn.toString(), p);
     if (p <= 0) return;
     const s = lerp(0.82, 1, spring(p));
     c.save();
@@ -69,6 +96,7 @@
   // 按进度画折线，返回当前端点和方向
   function path(c, pts, p, color = C.ink, lw = 4, dash) {
     p = clamp(p);
+    if (cue.on) cueNote('line', pts[0] + '', p);
     if (p <= 0) return null;
     let total = 0; const seg = [];
     for (let i = 1; i < pts.length; i++) { const d = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); seg.push(d); total += d; }
@@ -91,7 +119,10 @@
     return { end, ang };
   }
   function arrow(c, pts, p, color = C.ink, lw = 4, dash) {
+    if (cue.on) cueNote('line', pts[0] + '', clamp(p));
+    cue.inner++;
     const r = path(c, pts, p, color, lw, dash);
+    cue.inner--;
     if (!r || p < 0.08) return;
     const s = 9 + lw * 2.2;
     c.save();
@@ -117,8 +148,11 @@
   }
   // 品牌笔画：圆头主色横线，末尾带一撇点睛色
   function stroke(c, x, y, w, lw, p = 1) {
+    if (cue.on) cueNote('stroke', x + ',' + y, clamp(p));
+    cue.inner++;
     path(c, [[x, y], [x + w, y]], clamp(p * 1.4), C.accent, lw);
     path(c, [[x + w + lw * 1.6, y + lw * 0.1], [x + w + lw * 4.2, y + lw * 1.1]], clamp(p * 3.5 - 2.5), C.green, lw);
+    cue.inner--;
   }
   // 头像（brand.json 的 avatar），正片叠底让白底融进纸色；没配头像就不画
   function mark(c, x, y, size) {
@@ -134,7 +168,7 @@
     const pad = window.AVATAR ? 96 : 0;
     const w = measure(c, HANDLE, { size: 34, font: F.mono });
     const left = align === 'right' ? x - w - pad : x;
-    rise(c, p, () => { mark(c, left, y - 62, 84); txt(c, HANDLE, left + pad, y, { size: 34, font: F.mono, color: C.mute }); });
+    rise(c, p, () => { mark(c, left, y - 62, 84); txt(c, HANDLE, left + pad, y, { size: 34, font: F.mono, color: C.mute, read: false }); });
   }
   function fmt(n, d = 0) {
     return n.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -142,6 +176,7 @@
   function code(c, lines, x, y, p, o = {}) {
     const size = o.size || 32, lh = o.lh || size * 1.62;
     const total = lines.reduce((a, l) => a + l.length, 0);
+    if (cue.on) cueNote('type', lines[0], clamp(p));
     let left = Math.floor(total * clamp(p));
     lines.forEach((l, i) => {
       if (left <= 0) return;
@@ -151,5 +186,5 @@
     });
   }
 
-  window.E = { W, H, C, F, clamp, lerp, eo, eio, spring, txt, measure, rise, pop, rrect, path, arrow, chip, title, fmt, code, stroke, mark, sign, HANDLE, SERIES };
+  window.E = { W, H, C, F, clamp, lerp, eo, eio, spring, txt, measure, rise, pop, rrect, path, arrow, chip, title, fmt, code, stroke, mark, sign, HANDLE, seen, cue };
 })();
